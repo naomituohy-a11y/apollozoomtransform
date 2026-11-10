@@ -134,7 +134,8 @@ def read_csv_file(raw):
     except csv.Error:
         dialect = csv.excel
 
-    reader = csv.reader(io.StringIO(text, newline=""), dialect)
+    # Sniffer may see no escaped quotes in its sample. CSV uses doubled quotes.
+    reader = csv.reader(io.StringIO(text, newline=""), dialect, doublequote=True)
     try:
         headers = clean_headers(next(reader))
     except StopIteration:
