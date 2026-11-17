@@ -42,10 +42,6 @@ APOLLO_MAPPING = {
     "Direct": "Work Direct Phone",
     "Mobile": "Mobile Phone",
     "Person Linkedin Url": "Person Linkedin Url",
-    "Address1": "Company Address",
-    "City": "Company City",
-    "State": "Company State",
-    "Country": "Company Country",
     "Industry": "Industry",
     "Employees": "# Employees",
     "Revenue": "Annual Revenue",
@@ -53,11 +49,8 @@ APOLLO_MAPPING = {
     "Job Level": "Seniority",
     "Job Department": "Departments",
     "LI Company Url": "Company Linkedin Url",
-    "contact_country": "Country",
     "company_phone": "Company Phone",
     "email_confidence": "Email Confidence",
-    "contact_city": "City",
-    "contact_state": "State",
     "technologies": "Technologies",
     "email_status": "Email Status",
 }
@@ -72,11 +65,6 @@ ZOOMINFO_MAPPING = {
     "Direct": "Direct Phone Number",
     "Mobile": "Mobile phone",
     "Person Linkedin Url": "LinkedIn Contact Profile URL",
-    "Address1": "Company Street Address",
-    "City": "Company City",
-    "State": "Company State",
-    "Zipcode": "Company Zip Code",
-    "Country": "Company Country",
     "Industry": "Primary Industry",
     "Employees": "Employees",
     "Revenue": "Revenue (in 000s USD)",
@@ -84,12 +72,46 @@ ZOOMINFO_MAPPING = {
     "Job Level": "Management Level",
     "Job Department": "Department",
     "LI Company Url": "LinkedIn Company Profile URL",
-    "contact_country": "Country",
     "sub_industry": "Primary Sub-Industry",
     "company_phone": "Company HQ Phone",
-    "contact_city": "Person City",
-    "contact_state": "Person State",
 }
+
+# Only contact location headers qualify for the delivery address.
+CONTACT_LOCATION_HEADERS = {
+    "Address1": (
+        "Person Street Address", "Contact Street Address", "Person Address 1",
+        "Contact Address 1", "Person Address", "Contact Address",
+    ),
+    "Address2": ("Person Address 2", "Contact Address 2"),
+    "City": ("Person City", "Contact City", "City"),
+    "State": ("Person State", "Contact State", "State"),
+    "Zipcode": (
+        "Person Zip Code", "Contact Zip Code", "Person Postal Code",
+        "Contact Postal Code", "Person Postcode", "Contact Postcode",
+    ),
+    "Country": ("Person Country", "Contact Country", "Country"),
+}
+
+
+def default_mapping(source, headers):
+    mapping = (APOLLO_MAPPING if source == "Apollo" else ZOOMINFO_MAPPING).copy()
+    headers = {header.casefold(): header for header in headers}
+    for destination, candidates in CONTACT_LOCATION_HEADERS.items():
+        for candidate in candidates:
+            if candidate.casefold() in headers:
+                mapping[destination] = headers[candidate.casefold()]
+                break
+
+    for contact_field, address_field in (
+        ("contact_city", "City"),
+        ("contact_state", "State"),
+        ("contact_country", "Country"),
+    ):
+        if address_field in mapping:
+            mapping[contact_field] = mapping[address_field]
+
+    return mapping
+
 
 # These are deliberate initial mapping choices.
 # Users can review and change every mapping before downloading.
@@ -267,9 +289,7 @@ st.success(
     f"{len(data.columns)} input columns"
 )
 
-base_mapping = (
-    APOLLO_MAPPING if source == "Apollo" else ZOOMINFO_MAPPING
-)
+base_mapping = default_mapping(source, data.columns)
 
 missing = sorted({
     field for field in base_mapping.values()
@@ -284,10 +304,8 @@ if missing:
     )
 
 st.info(
-    "Initial mappings use company addresses for Address1/City/State/Country, "
-    "and person locations for contact_country/contact_city/contact_state. "
-    "Review or change these below. Internal IDs and verification results "
-    "remain blank by default."
+    "Address fields use the contact location by default. Missing contact "
+    "address fields stay blank. Review or change mappings below."
 )
 
 if source == "ZoomInfo":
@@ -322,7 +340,7 @@ with st.expander("Review or change column mappings", expanded=False):
                 required=False,
             )
         },
-        key=f"mapping_{uploaded.name}_{source}_{tuple(data.columns)}",
+        key=f"contact_address_mapping_{uploaded.name}_{source}_{tuple(data.columns)}",
     )
 
 output = pd.DataFrame("", index=data.index, columns=OUTPUT_HEADERS)
