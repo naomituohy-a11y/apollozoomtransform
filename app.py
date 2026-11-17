@@ -212,13 +212,35 @@ def domain_from_email(value):
     return domain
 
 
+COMPANY_ADDRESS_FIELDS = ("Address1", "Address2", "City", "State", "Zipcode", "Country")
+COUNTRY_ALIASES = {
+    "gb": "united kingdom", "gbr": "united kingdom", "uk": "united kingdom",
+    "u.k.": "united kingdom", "great britain": "united kingdom",
+    "england": "united kingdom", "scotland": "united kingdom",
+    "wales": "united kingdom", "northern ireland": "united kingdom",
+    "us": "united states", "usa": "united states", "u.s.": "united states",
+    "u.s.a.": "united states", "united states of america": "united states",
+}
+
+
+def country_comparison_key(value):
+    key = " ".join(str(value).split()).casefold()
+    return COUNTRY_ALIASES.get(key, key)
+
+
+def country_mismatch(output):
+    company = output["Country"].map(country_comparison_key)
+    contact = output["contact_country"].map(country_comparison_key)
+    return company.ne("") & contact.ne("") & company.ne(contact)
+
+
 st.title("LeadQA File Converter")
 st.write(
     "Upload Apollo or ZoomInfo data and download it in the "
     "76-column LeadQA format."
 )
 st.caption(
-    "Source values are copied unchanged. Domain is extracted from Email. "
+    "Mapped source values are copied as supplied. Domain is extracted from Email. "
     "Files are processed in memory; this app does not write uploads to disk."
 )
 
@@ -333,6 +355,25 @@ for _, row in edited_mapping.iterrows():
         output[row["Output column"]] = data[source_header]
 
 output["Domain"] = output["Email"].map(domain_from_email)
+
+mismatched = country_mismatch(output)
+if mismatched.any():
+    st.warning(
+        f"Company and contact countries differ on these records ({mismatched.sum():,}). "
+        "The main address fields use the company location by default."
+    )
+    with st.expander("Review records with different countries"):
+        st.dataframe(
+            output.loc[mismatched, [
+                "Company Name", "Email", "Address1", "City", "Country",
+                "contact_city", "contact_country",
+            ]],
+            hide_index=True,
+        )
+
+    if st.checkbox("Clear company addresses on these records before downloading"):
+        output.loc[mismatched, list(COMPANY_ADDRESS_FIELDS)] = ""
+
 
 left, middle, right = st.columns(3)
 left.metric("Output records", f"{len(output):,}")
