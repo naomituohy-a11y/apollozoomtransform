@@ -28,10 +28,10 @@ The output template is built in. No template upload is required.
 
 ## Initial mapping choices
 
-- Company addresses populate Address1, City, State, Zipcode and Country
-  where the source provides them.
-- Person location fields populate contact_country, contact_city and
-  contact_state.
+- Contact addresses populate Address1, Address2, City, State, Zipcode and
+  Country where the source provides them. Missing contact fields stay blank.
+- The same contact location defaults populate contact_country, contact_city
+  and contact_state.
 - Apollo Corporate Phone populates Switch.
 - Apollo Company Phone populates company_phone.
 - ZoomInfo Company HQ Phone populates both Switch and company_phone.
